@@ -1,6 +1,8 @@
 
 ## illustrative dataset meta-analysis
 
+# Example meta-analysis dataset
+
 RR <- c(0.157895,0.498016,0.324114,0.178804,0.333333) # relative risk
 selnRR <- c(0.615225,0.701461,0.341625,0.403829,0.656167) # standard error for log relative risk
 OR <- c(0.148361,0.491968,0.310397,0.164681,0.319149) # odds ratio
@@ -10,44 +12,74 @@ seRD <- c(0.016944,0.011817,0.0118,0.015574,0.023421)
 c <- c(61.8,20,41.8,0) # costs
 u <- c(18.65652,20.58,18.65652,20.58) # utilities
 
-install.packages("rmeta")
+
+# install.packages("rmeta")
 library("rmeta")
 
 ## all in one function for generating decision contours as shown in paper
 
-decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, sig.level=0.05, # data inputs: outcome is one of "lnRR", "lnOR", "RD". method is "fixed" or "random"
-                    contour=TRUE, contour.points=200, # should contours be overlayed and how many NxN pixels for when numerical method is applied
-                    uncertainty=FALSE, samples=1000, threshold=c(0.5,0.7,0.9),  greyscale=FALSE, # uncertainty or not. If greyscale is true then shades of 1-100 will be shown, if false then 50%, 70% and 90% thresholds are shown 
-                    summ=FALSE, summ.pos=0, pred.interval=FALSE, plot.zero=FALSE, plot.summ=FALSE, ylim=NULL, xlim=NULL, legend=TRUE, # plotting options
-                    expxticks=NULL, xticks=NULL, yticks=NULL, xlab=NULL, ylab=NULL, rand.load=10,
-                    legendpos=c(xlim[2]+0.05*(xlim[2]-xlim[1]),ylim[2]), xpoints=NULL, ypoints=NULL, points=TRUE) {
+decCont <- function(SS, # Effect estimates
+                    seSS, # Standard error of effect estimates
+                    method, # Fixed or random effects meta-analysis
+                    p.usual, # baseline probability of 
+                    costs = c, # costs from top to bottom of decision tree
+                    utilities = u, # utilities from top to bottom of decision tree
+                    wtp, # Willingness to Pay
+                    outcome, # outcome is one of "lnRR", "lnOR", "RD"
+                    sig.level=0.05, # significance level (for prediction and confidence intervals)
+                    contour=TRUE, # should contours be overlayed
+                    contour.points=200,  # how many NxN pixels for when numerical method is applied
+                    uncertainty=FALSE, # Should uncertainty be accounted for (in the meta-analysis summary effect)
+                    samples=1000, # No. Samples used to simulate uncertainty for each pixel
+                    greyscale=FALSE, # uncertainty must be TRUE. If greyscale is true then shades of 1-100% confidence will be shown for each pixel, if false then the next parameter, thresholds, is used 
+                    threshold=c(0.5,0.7,0.9), # thresholds of confidence to display
+                    summ=FALSE, # plot summary diamond
+                    summ.pos=0, # adjusting y position of summary diamond
+                    pred.interval=FALSE, # plot prediction interval when random effects model is used
+                    plot.zero=FALSE, # plot line of no effect
+                    plot.summ=FALSE, # plot line of effect estimate
+                    ylim=NULL, # y limits of plot
+                    xlim=NULL, # x limits of plot
+                    legend=TRUE, # plotting options
+                    expxticks=NULL,
+                    xticks=NULL,
+                    yticks=NULL,
+                    xlab=NULL,
+                    ylab=NULL,
+                    rand.load=10,
+                    legendpos=c(xlim[2]+0.05*(xlim[2]-xlim[1]),ylim[2]),
+                    xpoints=NULL,
+                    ypoints=NULL,
+                    points=TRUE) {
   
   
   
   meta <- meta.summaries(SS, seSS, method=method, conf.level=(1-sig.level))
   tau2 <- meta$tau2
-  ci <- qnorm(1-((sig.level)/2))
+  signorm <- qnorm(1-((sig.level)/2))
   
   length <- length(SS)
   
   c <- costs
   u <- utilities
   
-  zero <- (p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4])) + wtp*(u[4]-u[2])-c[4]+c[2])/(wtp*(u[1]-u[2])-(c[1]-c[2]))
-  value1 = wtp*(u[1]-u[2])-(c[1]-c[2])
-  value2 = p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4]))+wtp*u[4]-c[4] - (wtp*u[2]-c[2])
+  # shortcuts for calculations
+  value1 <- (p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4])) + wtp*(u[4]-u[2])-c[4]+c[2])/(wtp*(u[1]-u[2])-(c[1]-c[2]))
+  value2 = wtp*(u[1]-u[2])-(c[1]-c[2])
+  value3 = p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4]))+wtp*u[4]-c[4] - (wtp*u[2]-c[2])
   
   
-  #####CURRENT WEIGHTINGS of studies
+  # Calculate weights
   
   if (method=="random") {
     df <- NROW(SS) - 1
     df2= df+1
-    size <- 1/((seSS^2)+tau2)
+    weight <- 1/((seSS^2)+tau2)
   }
   
-  else size <- 1/(seSS^2)
+  else weight <- 1/(seSS^2)
   
+  # Set appropriate limits
   
   sediff <- max(seSS) - min(seSS)
   
@@ -66,42 +98,45 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
     xlim <- c(min(SS) - 0.2*SSdiff, max(SS) + 0.2*SSdiff)
   }
   
+  # Compute contour curves for analytical cases
+  
   if (contour) {
     cSS <- seq(xlim[1], xlim[2], length.out=contour.points)
-    csize <- seq(ylim[1], ylim[2], length.out=contour.points)
-    csize[csize<=0] <- 0.0000001*min(seSS)
-    for (k in 2:length(csize)) if (csize[k]==0 & csize[k-1]==0) csize[k] <- NA
-    csize <- csize[!is.na(csize)]
+    cWeight <- seq(ylim[1], ylim[2], length.out=contour.points)
+    cWeight[cWeight<=0] <- 0.0000001*min(seSS)
+    for (k in 2:length(cWeight)) if (cWeight[k]==0 & cWeight[k-1]==0) cWeight[k] <- NA
+    cWeight <- cWeight[!is.na(cWeight)]
   }
-  
   
   if (contour) {
     
     if (method=="fixed" & uncertainty==FALSE) {
       
-      vwt <- 1/(csize^2)
+      vwt <- 1/(cWeight^2)
       
       if (outcome=="lnOR") {
-        cSS <- (1/vwt)*((log(1/(p.usual*(1-zero))*zero*(1-p.usual)))*(sum(size) + vwt) - sum(size*SS))
+        cSS <- (1/vwt)*((log(1/(p.usual*(1-value1))*value1*(1-p.usual)))*(sum(weight) + vwt) - sum(weight*SS))
       }
       
       if (outcome=="lnRR") {
-        cSS <- (1/vwt)*(log((1/p.usual)*zero)*(sum(size) + vwt) - sum(size*SS))
+        cSS <- (1/vwt)*(log((1/p.usual)*value1)*(sum(weight) + vwt) - sum(weight*SS))
       }
       
       if (outcome=="RD") {
-        cSS <- (1/vwt)*((zero-p.usual)*(sum(size) + vwt) - sum(size*SS))
+        cSS <- (1/vwt)*((value1-p.usual)*(sum(weight) + vwt) - sum(weight*SS))
       }
       
     }
+    
+    # Compute contour regions for numerical method cases
     
     if (method=="random" & uncertainty==FALSE)  {
       
       if (outcome=="RD") {
         
-        matcont <- rep(0,times=length(csize))
+        matcont <- rep(0,times=length(cWeight))
         
-        for (i in 1: length(csize))  {
+        for (i in 1: length(cWeight))  {
           
           if (rand.load>0) {
             roundi<-i/rand.load
@@ -113,11 +148,11 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
             else cat(".")
           }
           
-          if ( !is.na(csize[i]) ) {
+          if ( !is.na(cWeight[i]) ) {
             
             cSS1=min(cSS)
             
-            while((meta.summaries(c(SS, cSS1), c(seSS, csize[i]), method=method)$summary + p.usual)*value1 - value2 > 0) {
+            while((meta.summaries(c(SS, cSS1), c(seSS, cWeight[i]), method=method)$summary + p.usual)*value2 - value3 > 0) {
               
               
               cSS1=cSS1+((max(cSS)-min(cSS))/contour.points)
@@ -134,9 +169,9 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
       
       if (outcome=="lnRR") {
         
-        matcont <- rep(0,times=length(csize)) 
+        matcont <- rep(0,times=length(cWeight)) 
         
-        for (i in 1: length(csize))  {
+        for (i in 1: length(cWeight))  {
           
           if (rand.load>0) {
             roundi<-i/rand.load
@@ -148,11 +183,11 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
             else cat(".")
           }
           
-          if ( !is.na(csize[i]) ) {
+          if ( !is.na(cWeight[i]) ) {
             
             cSS1=min(cSS)
             
-            while(p.usual*exp(meta.summaries(c(SS, cSS1), c(seSS, csize[i]), method=method)$summary)*value1 - value2 > 0) {
+            while(p.usual*exp(meta.summaries(c(SS, cSS1), c(seSS, cWeight[i]), method=method)$summary)*value2 - value3 > 0) {
               
               
               cSS1=cSS1+((max(cSS)-min(cSS))/contour.points)
@@ -169,9 +204,9 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
       
       if (outcome=="lnOR") {
         
-        matcont <- rep(0,times=length(csize))
+        matcont <- rep(0,times=length(cWeight))
         
-        for (i in 1: length(csize))  {
+        for (i in 1: length(cWeight))  {
           
           if (rand.load>0) {
             roundi<-i/rand.load
@@ -183,11 +218,11 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
             else cat(".")
           }
           
-          if ( !is.na(csize[i]) ) {
+          if ( !is.na(cWeight[i]) ) {
             
             cSS1=min(cSS)
             
-            while(((exp(meta.summaries(c(SS, cSS1), c(seSS, csize[i]), method=method)$summary)*p.usual)/(1-p.usual+p.usual*exp(meta.summaries(c(SS, cSS1), c(seSS, csize[i]), method=method)$summary)))*value1 - value2 > 0) {
+            while(((exp(meta.summaries(c(SS, cSS1), c(seSS, cWeight[i]), method=method)$summary)*p.usual)/(1-p.usual+p.usual*exp(meta.summaries(c(SS, cSS1), c(seSS, cWeight[i]), method=method)$summary)))*value2 - value3 > 0) {
               
               
               cSS1=cSS1+((max(cSS)-min(cSS))/contour.points)
@@ -206,10 +241,10 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
     
     if (uncertainty==TRUE)  {
       
-      matcont <- matrix(rep(NA,times=length(cSS)*length(csize)),nrow=length(csize))	
+      matcont <- matrix(rep(NA,times=length(cSS)*length(cWeight)),nrow=length(cWeight))	
       overmax <- 0
       
-      for (i in 1: length(csize))  {
+      for (i in 1: length(cWeight))  {
         
         if (rand.load>0) {
           roundi<-i/rand.load
@@ -221,11 +256,11 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
           else cat(".")
         }
         
-        if ( !is.na(csize[i]) ) {
+        if ( !is.na(cWeight[i]) ) {
           
           for (j in 1:length(cSS))  {
             
-            metacont <- meta.summaries(c(SS, cSS[j]), c(seSS, csize[i]), method=method, conf.level=(1-sig.level))
+            metacont <- meta.summaries(c(SS, cSS[j]), c(seSS, cWeight[i]), method=method, conf.level=(1-sig.level))
             
             if (outcome=="RD") {
               s <- rnorm(samples,metacont$summary,metacont$se.summary)
@@ -277,6 +312,7 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
     
   }
   
+  # plot points and contours
   
   dev.new(width=11, height=11)
   par(mai = c(1, .8, .2, .2))
@@ -295,9 +331,9 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
   
   if (contour & uncertainty==TRUE & greyscale==TRUE) {
     for (j in 1:(length(cSS)-1)) {
-      for (i in 1:(length(csize)-1)) {
+      for (i in 1:(length(cWeight)-1)) {
         
-        polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(csize[i],csize[i+1],csize[i+1],csize[i]), 
+        polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]), 
                 border=matcont[i,j], col = matcont[i,j])
         
       }
@@ -306,19 +342,19 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
   
   if (contour & uncertainty==TRUE & greyscale==FALSE) {
     for (j in 1:(length(cSS)-1)) {
-      for (i in 1:(length(csize)-1)) {
+      for (i in 1:(length(cWeight)-1)) {
         
         if (matcont[i,j]==0)
-          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(csize[i],csize[i+1],csize[i+1],csize[i]), 
+          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]), 
                   border="white", col = "white")
         if (matcont[i,j]==1)
-          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(csize[i],csize[i+1],csize[i+1],csize[i]), 
+          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]), 
                   border="gray90", col = "gray90")
         if (matcont[i,j]==2)
-          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(csize[i],csize[i+1],csize[i+1],csize[i]), 
+          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]), 
                   border="gray80", col = "gray80")
         if (matcont[i,j]==3)
-          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(csize[i],csize[i+1],csize[i+1],csize[i]), 
+          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]), 
                   border="gray70", col = "gray70")
         
         
@@ -329,19 +365,19 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
   
   if (contour & uncertainty==FALSE & method=="random") {
     
-    polygon(c(matcont,xlim[1],xlim[1]), c(csize,ylim[2],ylim[1]), border="gray72", col = "gray72")
+    polygon(c(matcont,xlim[1],xlim[1]), c(cWeight,ylim[2],ylim[1]), border="gray72", col = "gray72")
   }
   
   if (contour & uncertainty==FALSE & method=="fixed") {
     
-    polygon(c(cSS,xlim[1],xlim[1]), c(csize,ylim[2],ylim[1]), border="gray72", col = "gray72")
+    polygon(c(cSS,xlim[1],xlim[1]), c(cWeight,ylim[2],ylim[1]), border="gray72", col = "gray72")
     
     
   }
   
   
   if (summ) {
-    xsumm <- c(meta$summary - ci*meta$se.summary, meta$summary, meta$summary + ci*meta$se.summary, meta$summary)
+    xsumm <- c(meta$summary - signorm*meta$se.summary, meta$summary, meta$summary + signorm*meta$se.summary, meta$summary)
     ysumm <- c(ylim[2]-0.10*axisdiff+summ.pos,ylim[2]-0.07*axisdiff+summ.pos,ylim[2]-0.10*axisdiff+summ.pos,ylim[2]-0.13*axisdiff+summ.pos)
     
     if (pred.interval) {	
@@ -372,9 +408,11 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
     points(SS, seSS, ylim=ylim, xlim=xlim, xlab = xlab, ylab = ylab, pch=19, cex=cexpoints, col= "black", xaxt=xaxis)
   }
   
+  # plot title
+  
   if (outcome=="RD") {
     
-    if ((meta.summaries(SS,seSS, method=method)$summary + p.usual)*value1 - value2 > 0) {
+    if ((meta.summaries(SS,seSS, method=method)$summary + p.usual)*value2 - value3 > 0) {
       title(main="Current Decision: NI is Cost-Effective",cex.main=1.5,line=0.6)
     }
     
@@ -387,7 +425,7 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
   
   if (outcome=="lnRR") {
     
-    if (p.usual*exp(meta.summaries(SS,seSS, method=method)$summary)*value1 - value2 > 0) {
+    if (p.usual*exp(meta.summaries(SS,seSS, method=method)$summary)*value2 - value3 > 0) {
       title(main="Current Decision: NI is Cost-Effective",cex.main=1.5,line=0.6)
     }
     
@@ -400,7 +438,7 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
   
   if (outcome=="lnOR") {
     
-    if (((exp(meta.summaries(SS, seSS, method=method)$summary)*p.usual)/(1-p.usual+p.usual*exp(meta.summaries(SS,seSS, method=method)$summary)))*value1 - value2 > 0) {
+    if (((exp(meta.summaries(SS, seSS, method=method)$summary)*p.usual)/(1-p.usual+p.usual*exp(meta.summaries(SS,seSS, method=method)$summary)))*value2 - value3 > 0) {
       title(main="Current Decision: NI is Cost-Effective",cex.main=1.5,line=0.6)
     }
     
@@ -410,6 +448,8 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
     
     
   }
+  
+  # plot legends
   
   if (uncertainty==FALSE) {
     legend("bottomleft",c(
@@ -447,11 +487,25 @@ decCont <- function(SS, seSS, method, p.usual, costs, utilities, wtp, outcome, s
 
 
 # An example call of this function would be:
-decCont(SS=log(RR),seSS=selnRR,method="fixed",uncertainty=TRUE,greyscale=FALSE,
-        summ=TRUE,pred.interval=TRUE,plot.zero=TRUE,plot.summ=TRUE,
-        p.usual=0.05,costs=c,utilities=u,wtp=270,outcome="lnRR",
-        xlab="Log Relative Risk",ylab="Standard Error",xlim=c(-2,2),
-        ylim=c(0,1),contour=TRUE)
+decCont(SS=log(RR),
+        seSS=selnRR,
+        method="fixed",
+        uncertainty=TRUE,
+        greyscale=FALSE,
+        summ=TRUE,
+        pred.interval=TRUE,
+        plot.zero=TRUE,
+        plot.summ=TRUE,
+        p.usual=0.05,
+        costs=c,
+        utilities=u,
+        wtp=270,
+        outcome="lnRR",
+        xlab="Log Relative Risk",
+        ylab="Standard Error",
+        xlim=c(-2,2),
+        ylim=c(0,1),contour=TRUE
+        )
 
 
 # function that overlays simulated studies onto the funnel plot (can be applied directly after contour generation)
