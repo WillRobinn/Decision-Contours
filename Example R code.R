@@ -39,15 +39,13 @@ decCont <- function(SS, # Effect estimates
                     plot.zero=FALSE, # plot line of no effect
                     plot.summ=FALSE, # plot line of effect estimate
                     ylim=NULL, # y limits of plot
-                    xlim=NULL, # x limits of plot
+                    xlim=NULL, # x limits of plot (exponentiated if RR or OR)
                     legend=TRUE, # plotting options
                     expxticks=NULL,
                     xticks=NULL,
                     yticks=NULL,
-                    xlab=NULL,
-                    ylab=NULL,
                     rand.load=10,
-                    legendpos=c(xlim[2]+0.05*(xlim[2]-xlim[1]),ylim[2]),
+                    legendpos="topright",
                     xpoints=NULL,
                     ypoints=NULL,
                     points=TRUE) {
@@ -326,8 +324,31 @@ decCont <- function(SS, # Effect estimates
   if (!points) cexpoints <- 0
   else cexpoints <- 1
   
-  plot(SS, seSS, ylim=ylim, xlim=xlim, xlab = xlab, ylab = ylab, pch=19, cex=cexpoints, cex.lab=1.35, cex.axis=1.35, col= "black", 
-       xaxt=xaxis, yaxt=yaxis, xaxs="i", yaxs="i")
+  if (outcome == "lnRR") {
+    xlab = "Relative Risk"
+  }
+  
+  if (outcome == "lnOR") {
+    xlab = "Odds Ratio"
+  }
+  
+  if (outcome == "RD") {
+    xlab = "Risk Difference"
+  }
+  
+  if (outcome == "lnRR" | outcome == "lnOR") {
+    
+    plot(SS, seSS, ylim=ylim, xlim=xlim, xlab = xlab, ylab = "Standard Error", pch=19, cex=cexpoints, cex.lab=1.35, cex.axis=1.35, col= "black", 
+         xaxt = "n", yaxt=yaxis, xaxs="i", yaxs="i")
+    
+    axis(1, at = seq(xlim[1], xlim[2], length = 5), labels = round(exp(seq(xlim[1], xlim[2], length = 5)),2))
+    
+  } else {
+    plot(SS, seSS, ylim=ylim, xlim=xlim, xlab = xlab, ylab = "Standard Error", pch=19, cex=cexpoints, cex.lab=1.35, cex.axis=1.35, col= "black", 
+         xaxt=xaxis, yaxt=yaxis, xaxs="i", yaxs="i")
+  }
+  
+
   
   if (contour & uncertainty==TRUE & greyscale==TRUE) {
     for (j in 1:(length(cSS)-1)) {
@@ -401,11 +422,11 @@ decCont <- function(SS, # Effect estimates
   box()
   
   if (greyscale==TRUE) {
-    points(SS, seSS, ylim=ylim, xlim=xlim, xlab = xlab, ylab = ylab, pch=21, cex=cexpoints, col= "black",bg="white", xaxt=xaxis)
+    points(SS, seSS, ylim=ylim, xlim=xlim, xlab = xlab, ylab = "Standard Error", pch=21, cex=cexpoints, col= "black",bg="white", xaxt=xaxis)
   }
   
   else {
-    points(SS, seSS, ylim=ylim, xlim=xlim, xlab = xlab, ylab = ylab, pch=19, cex=cexpoints, col= "black", xaxt=xaxis)
+    points(SS, seSS, ylim=ylim, xlim=xlim, xlab = xlab, ylab = "Standard Error", pch=19, cex=cexpoints, col= "black", xaxt=xaxis)
   }
   
   # plot title
@@ -452,7 +473,7 @@ decCont <- function(SS, # Effect estimates
   # plot legends
   
   if (uncertainty==FALSE) {
-    legend("bottomleft",c(
+    legend(legendpos,c(
       "Favour NI (Treatment A)","Favour Placebo (Treatment B)",
       "Pooled Effect","Null Effect"
     ),
@@ -467,7 +488,7 @@ decCont <- function(SS, # Effect estimates
   }
   
   if (uncertainty == TRUE & greyscale == FALSE) {
-    legend("topright",c(paste(">",100*threshold[1],"% of samples favour placebo",sep=""),
+    legend(legendpos,c(paste(">",100*threshold[1],"% of samples favour placebo",sep=""),
                         paste(">",100*threshold[1],"% of samples favour NI",sep=""),
                         paste(">",100*threshold[2],"% of samples favour NI",sep=""),
                         paste(">",100*threshold[3],"% of samples favour NI",sep="")),
@@ -476,7 +497,7 @@ decCont <- function(SS, # Effect estimates
   }
   
   if (uncertainty & greyscale ==TRUE) {
-    legend("bottomright",c("100%","90%","80%","70%","60%","50%"
+    legend(legendpos,c("100%","90%","80%","70%","60%","50%"
     )
     ,bg="white",cex=1.15,
     fill=c("gray0","gray20","gray40","gray60","gray80","gray100"))
@@ -490,7 +511,9 @@ decCont <- function(SS, # Effect estimates
 decCont(SS=log(RR),
         seSS=selnRR,
         method="fixed",
-        uncertainty=TRUE,
+        contour=TRUE,
+        outcome="lnRR",
+        uncertainty=FALSE,
         greyscale=FALSE,
         summ=TRUE,
         pred.interval=TRUE,
@@ -500,11 +523,9 @@ decCont(SS=log(RR),
         costs=c,
         utilities=u,
         wtp=270,
-        outcome="lnRR",
-        xlab="Log Relative Risk",
-        ylab="Standard Error",
         xlim=c(-2,2),
-        ylim=c(0,1),contour=TRUE
+        ylim=c(0,1),
+        legendpos="bottomright"
         )
 
 
