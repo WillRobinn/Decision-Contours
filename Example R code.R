@@ -20,7 +20,7 @@ library("rmeta")
 
 decCont <- function(SS, # Effect estimates
                     seSS, # Standard error of effect estimates
-                    method, # Fixed or random effects meta-analysis
+                    method, # 'fixed' or 'random' effects meta-analysis
                     p.usual, # baseline probability of 
                     costs = c, # costs from top to bottom of decision tree
                     utilities = u, # utilities from top to bottom of decision tree
@@ -32,7 +32,7 @@ decCont <- function(SS, # Effect estimates
                     uncertainty=FALSE, # Should uncertainty be accounted for (in the meta-analysis summary effect)
                     samples=1000, # No. Samples used to simulate uncertainty for each pixel
                     greyscale=FALSE, # uncertainty must be TRUE. If greyscale is true then shades of 1-100% confidence will be shown for each pixel, if false then the next parameter, thresholds, is used 
-                    threshold=c(0.5,0.7,0.9), # thresholds of confidence to display
+                    threshold=c(0.5,0.7,0.9), # thresholds of confidence to display, need to remove comments in function for more than one threshold (lines 283, 378 and 500)
                     summ=FALSE, # plot summary diamond
                     summ.pos=0, # adjusting y position of summary diamond
                     pred.interval=FALSE, # plot prediction interval when random effects model is used
@@ -279,8 +279,11 @@ decCont <- function(SS, # Effect estimates
               
               if ( sum(p.new*(wtp*(u[1]-u[2])-(c[1]-c[2]))+wtp*u[2]-c[2] > p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4]))+wtp*u[4]-c[4]) < samples*threshold[1] ) matcont[i,j] <- 0
               if ( sum(p.new*(wtp*(u[1]-u[2])-(c[1]-c[2]))+wtp*u[2]-c[2] > p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4]))+wtp*u[4]-c[4]) > samples*threshold[1]-1 ) matcont[i,j] <- 1
-              if ( sum(p.new*(wtp*(u[1]-u[2])-(c[1]-c[2]))+wtp*u[2]-c[2] > p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4]))+wtp*u[4]-c[4]) > samples*threshold[2]-1 ) matcont[i,j] <- 2
-              if ( sum(p.new*(wtp*(u[1]-u[2])-(c[1]-c[2]))+wtp*u[2]-c[2] > p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4]))+wtp*u[4]-c[4]) > samples*threshold[3]-1 ) matcont[i,j] <- 3
+              
+              # if more than one threshold then comment out
+              
+              # if ( sum(p.new*(wtp*(u[1]-u[2])-(c[1]-c[2]))+wtp*u[2]-c[2] > p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4]))+wtp*u[4]-c[4]) > samples*threshold[2]-1 ) matcont[i,j] <- 2
+              # if ( sum(p.new*(wtp*(u[1]-u[2])-(c[1]-c[2]))+wtp*u[2]-c[2] > p.usual*(wtp*(u[3]-u[4])-(c[3]-c[4]))+wtp*u[4]-c[4]) > samples*threshold[3]-1 ) matcont[i,j] <- 3
             }
             
             if (greyscale==TRUE) {
@@ -325,11 +328,11 @@ decCont <- function(SS, # Effect estimates
   else cexpoints <- 1
   
   if (outcome == "lnRR") {
-    xlab = "Relative Risk"
+    xlab = "Relative Risk (log scale)"
   }
   
   if (outcome == "lnOR") {
-    xlab = "Odds Ratio"
+    xlab = "Odds Ratio (log scale)"
   }
   
   if (outcome == "RD") {
@@ -371,12 +374,15 @@ decCont <- function(SS, # Effect estimates
         if (matcont[i,j]==1)
           polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]), 
                   border="gray90", col = "gray90")
-        if (matcont[i,j]==2)
-          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]), 
-                  border="gray80", col = "gray80")
-        if (matcont[i,j]==3)
-          polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]), 
-                  border="gray70", col = "gray70")
+        
+        # if more than one threshold then comment out
+
+        # if (matcont[i,j]==2)
+        #   polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]),
+        #           border="gray80", col = "gray80")
+        # if (matcont[i,j]==3)
+        #   polygon(c(cSS[j],cSS[j],cSS[j+1],cSS[j+1]),c(cWeight[i],cWeight[i+1],cWeight[i+1],cWeight[i]),
+        #           border="gray70", col = "gray70")
         
         
         
@@ -489,9 +495,14 @@ decCont <- function(SS, # Effect estimates
   
   if (uncertainty == TRUE & greyscale == FALSE) {
     legend(legendpos,c(paste(">",100*threshold[1],"% of samples favour placebo",sep=""),
-                        paste(">",100*threshold[1],"% of samples favour NI",sep=""),
-                        paste(">",100*threshold[2],"% of samples favour NI",sep=""),
-                        paste(">",100*threshold[3],"% of samples favour NI",sep="")),
+                        paste(">",100*threshold[1],"% of samples favour NI",sep="")
+                       
+                       # if more than one threshold then remove comments
+                       
+                        # ,paste(">",100*threshold[2],"% of samples favour NI",sep=""),
+                        # paste(">",100*threshold[3],"% of samples favour NI",sep="")
+                       
+                       ),
            bg="white",cex=1.15,
            fill=c("white","gray90","gray80","gray70"))
   }
@@ -512,20 +523,23 @@ decCont(SS=log(RR),
         seSS=selnRR,
         method="fixed",
         contour=TRUE,
+        contour.points=200,
         outcome="lnRR",
-        uncertainty=FALSE,
+        uncertainty=TRUE,
+        samples=1000,
         greyscale=FALSE,
-        summ=TRUE,
-        pred.interval=TRUE,
-        plot.zero=TRUE,
-        plot.summ=TRUE,
+        threshold = c(0.5,0.7,0.9),
+        summ=FALSE,
+        pred.interval=FALSE,
+        plot.zero=FALSE,
+        plot.summ=FALSE,
         p.usual=0.05,
         costs=c,
         utilities=u,
         wtp=270,
         xlim=c(-2,2),
         ylim=c(0,1),
-        legendpos="bottomright"
+        legendpos="topright"
         )
 
 
